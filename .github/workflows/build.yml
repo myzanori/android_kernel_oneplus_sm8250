@@ -30,9 +30,8 @@ jobs:
       - name: Download & Extract Clang 10 Toolchain
         run: |
           mkdir -p toolchains/clang-10
-          echo "Downloading AOSP / ZyC Clang 10..."
-          curl -LSs "https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-10.0.1-20210214.tar.gz" -o clang.tar.gz || \
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r1/clang-r383902.tar.gz" -o clang.tar.gz
+          echo "Downloading official AOSP Clang 10 (r383902)..."
+          curl -LSs --fail "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r1/clang-r383902.tar.gz" -o clang.tar.gz
           tar -xzf clang.tar.gz -C toolchains/clang-10/
           rm -f clang.tar.gz
 
