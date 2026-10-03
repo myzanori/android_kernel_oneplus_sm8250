@@ -1,1 +1,1 @@
-../../../../vendor/oplus/kernel/misc/sim_detect.c
+../../vendor/oplus/kernel/misc/sim_detect.c

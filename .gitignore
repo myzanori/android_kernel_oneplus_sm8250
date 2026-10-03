@@ -141,3 +141,14 @@ techpack/
 
 # ignore net/oplus_modules
 net/oplus_modules
+
+# --- custom build artifacts & links ---
+/out/
+/vendor/
+/KernelSU/
+/msm-4.19
+/kernel/msm-4.19
+/drivers/kernel
+*.img
+*.zip
+*.rej
