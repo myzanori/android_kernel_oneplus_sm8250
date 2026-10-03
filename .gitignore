@@ -138,3 +138,15 @@ kernel/configs/android-*.cfg
 
 # Tech package directories
 techpack/
+
+# --- custom build artifacts & links ---
+/out/
+/vendor/
+/KernelSU/
+/msm-4.19
+/kernel/msm-4.19
+/drivers/kernel
+*.img
+*.zip
+*.rej
+*.log

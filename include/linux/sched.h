@@ -868,6 +868,16 @@ union reclaim_limit {
 };
 #endif
 
+#if IS_ENABLED(CONFIG_OPLUS_LOCKING_STRATEGY)
+struct locking_info {
+	u64 waittime_stamp;
+	u64 opt_spin_start_time;
+	struct task_struct *holder;
+	bool ux_contrib;
+	bool is_block_ux;
+};
+#endif
+
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/*
@@ -1639,6 +1649,9 @@ struct task_struct {
 #endif /* CONFIG_OPLUS_FEATURE_INPUT_BOOST_V4 */
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_FDLEAK_CHECK)
 	unsigned int fdleak_flag;
+#endif
+#if IS_ENABLED(CONFIG_OPLUS_LOCKING_STRATEGY)
+	struct locking_info lkinfo;
 #endif
 	/* task is frozen/stopped (used by the cgroup freezer) */
 
