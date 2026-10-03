@@ -61,7 +61,7 @@ jobs:
 
       - name: Compile Mystic Kernel
         run: |
-          chmod +x mystic_version.sh build_tools/*.sh build_tools/*.py
+          chmod +x mystic_version.sh build_tools/*.sh build_tools/*.py 2>/dev/null || true
           . ./mystic_version.sh
           
           export PATH="$PWD/toolchains/clang-10/bin:$PATH"
@@ -69,13 +69,14 @@ jobs:
           export KCFLAGS="-Wno-strict-prototypes -Wno-missing-prototypes -Wno-unused-function -Wno-unused-variable"
           
           # Export OPLUS feature env
-          python3 - > .oplus_env.sh <<'PY'
-          import re
-          for line in open("oplus_native_features.mk"):
-              m = re.match(r'^(OPLUS_[A-Z0-9_]+)=(.*)$', line.rstrip("\n"))
-              if m:
-                  print("export %s='%s'" % (m.group(1), m.group(2).replace("'", "'\\''")))
-          PY
+          python3 -c "
+import re
+with open('.oplus_env.sh', 'w') as out:
+    for line in open('oplus_native_features.mk'):
+        m = re.match(r'^(OPLUS_[A-Z0-9_]+)=(.*)$', line.rstrip('\n'))
+        if m:
+            out.write('export %s=\"%s\"\n' % (m.group(1), m.group(2).replace('\"', '\\\"')))
+"
           . .oplus_env.sh
           
           CL="$PWD/toolchains/clang-10/bin/clang"
@@ -118,35 +119,38 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git ak3
           cp out/arch/arm64/boot/Image ak3/Image
           
-          cat > ak3/anykernel.sh <<'AK3EOF'
-          ### AnyKernel3 Ramdisk Mod Script
-          ## osm0sis @ xda-developers
-          properties() { '
-          kernel.string=Mystic Kernel v1.0 (ReSukiSU + SUSFS v2.3.0) by myzanori
-          do.devicecheck=1
-          do.modules=0
-          do.systemless=1
-          do.cleanup=1
-          do.cleanuponabort=0
-          device.name1=lemonades
-          device.name2=OnePlus9R
-          device.name3=kebab
-          device.name4=OnePlus8T
-          device.name5=20828
-          device.name6=20838
-          '; }
-          boot_attributes() {
-          set_perm_recursive 0 0 755 644 $RAMDISK/*;
-          set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
-          }
-          BLOCK=boot;
-          IS_SLOT_DEVICE=1;
-          RAMDISK_COMPRESSION=auto;
-          PATCH_VBMETA_FLAG=auto;
-          . tools/ak3-core.sh;
-          dump_boot;
-          write_boot;
-          AK3EOF
+          python3 -c "
+ak_content = '''### AnyKernel3 Ramdisk Mod Script
+## osm0sis @ xda-developers
+properties() { '
+kernel.string=Mystic Kernel (ReSukiSU + SUSFS v2.3.0) by myzanori
+do.devicecheck=1
+do.modules=0
+do.systemless=1
+do.cleanup=1
+do.cleanuponabort=0
+device.name1=lemonades
+device.name2=OnePlus9R
+device.name3=kebab
+device.name4=OnePlus8T
+device.name5=20828
+device.name6=20838
+'; }
+boot_attributes() {
+set_perm_recursive 0 0 755 644 \$RAMDISK/*;
+set_perm_recursive 0 0 750 750 \$RAMDISK/init* \$RAMDISK/sbin;
+}
+BLOCK=boot;
+IS_SLOT_DEVICE=1;
+RAMDISK_COMPRESSION=auto;
+PATCH_VBMETA_FLAG=auto;
+. tools/ak3-core.sh;
+dump_boot;
+write_boot;
+'''
+with open('ak3/anykernel.sh', 'w') as f:
+    f.write(ak_content)
+"
 
           (cd ak3 && zip -r9 "../release_out/${MYSTIC_PREFIX}_${MYSTIC_FLAVOUR}_AnyKernel3.zip" . -x "*.git*" "*.zip")
           cp out/arch/arm64/boot/Image "release_out/${MYSTIC_PREFIX}.Image"
@@ -201,12 +205,21 @@ jobs:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          CAPTION=$(cat << EOF
-<b>Mystic Kernel ${{ steps.ver.outputs.tag }} — Release</b>
+          python3 -c "
+import urllib.request, urllib.parse, os, glob
+
+token = os.environ.get('TG_TOKEN', '')
+chat_id = os.environ.get('TG_CHAT', '')
+tag = '${{ steps.ver.outputs.tag }}'
+
+if not token or not chat_id:
+    exit(0)
+
+caption = f'''<b>Mystic Kernel {tag} — Release</b>
 
 • <b>Device</b>: OnePlus 9R (lemonades / SM8250)
 • <b>ROM</b>: OxygenOS 14 (Android 14)
-• <b>Kernel</b>: 4.19.157-perf-Mystic-9R-myzanori-${{ steps.ver.outputs.tag }}
+• <b>Kernel</b>: 4.19.157-perf-Mystic-9R-myzanori-{tag}
 • <b>Status</b>: Boot Tested &amp; Verified (Working)
 • <b>Root</b>: ReSukiSU v4.2.0-rc3
 • <b>Hiding</b>: SUSFS v2.3.0
@@ -224,17 +237,13 @@ jobs:
 • Full vendor module compatibility (35/35 modules loaded)
 • Complete camera subsystem fix (8/8 sensors functional)
 • Native F2FS compression and inlinecrypt support
-</blockquote>
-EOF
-)
-          for f in release_out/*.zip; do
-            if [ -f "$f" ]; then
-              echo "Sending $f to Telegram..."
-              curl -sS --fail \
-                -F chat_id="${TG_CHAT}" \
-                -F parse_mode=HTML \
-                -F caption="${CAPTION}" \
-                -F document=@"$f" \
-                "https://api.telegram.org/bot${TG_TOKEN}/sendDocument" || true
-            fi
-          done
+</blockquote>'''
+
+import requests
+for f in glob.glob('release_out/*.zip'):
+    with open(f, 'rb') as doc:
+        files = {'document': doc}
+        data = {'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'}
+        r = requests.post(f'https://api.telegram.org/bot{token}/sendDocument', data=data, files=files)
+        print('Telegram response:', r.text)
+"
