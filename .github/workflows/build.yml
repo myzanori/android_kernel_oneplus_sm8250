@@ -27,11 +27,11 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             bc bison ca-certificates curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            git libssl-dev lld llvm make python3 python3-pip zip unzip libelf-dev
+            git libssl-dev lld llvm make python3 zip unzip libelf-dev
 
       - name: Download & Extract Clang 10 Toolchain
         run: |
-          mkdir -p toolchains/clang-10 toolchains/gcc-64 toolchains/gcc-32
+          mkdir -p toolchains/clang-10
           echo "Downloading AOSP / ZyC Clang 10..."
           curl -LSs "https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Clang-10.0.1-20210214.tar.gz" -o clang.tar.gz || \
           curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r1/clang-r383902.tar.gz" -o clang.tar.gz
@@ -63,23 +63,16 @@ jobs:
 
       - name: Compile Mystic Kernel
         run: |
-          chmod +x mystic_version.sh build_tools/*.sh build_tools/*.py 2>/dev/null || true
+          chmod +x mystic_version.sh build_tools/* 2>/dev/null || true
           . ./mystic_version.sh
           
           export PATH="$PWD/toolchains/clang-10/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/toolchains/clang-10/lib:${LD_LIBRARY_PATH:-}"
           export KCFLAGS="-Wno-strict-prototypes -Wno-missing-prototypes -Wno-unused-function -Wno-unused-variable"
           
-          # Export OPLUS feature env
-          python3 -c "
-import re
-with open('.oplus_env.sh', 'w') as out:
-    for line in open('oplus_native_features.mk'):
-        m = re.match(r'^(OPLUS_[A-Z0-9_]+)=(.*)$', line.rstrip('\n'))
-        if m:
-            out.write('export %s=\"%s\"\n' % (m.group(1), m.group(2).replace('\"', '\\\"')))
-"
-          . .oplus_env.sh
+          # Generate OPLUS environment exports
+          sed -n -E 's/^(OPLUS_[A-Z0-9_]+)=(.*)$/export \1="\2"/p' oplus_native_features.mk > .oplus_env.sh
+          . ./.oplus_env.sh
           
           CL="$PWD/toolchains/clang-10/bin/clang"
           MK=(O=out ARCH=arm64 CC="$CL" CLANG_TRIPLE=aarch64-linux-gnu- BRAND_SHOW_FLAG=oneplus
@@ -106,6 +99,17 @@ with open('.oplus_env.sh', 'w') as out:
           ./scripts/config --file out/.config --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
           ./scripts/config --file out/.config --enable CONFIG_KSU_SUSFS_SUS_MAP
           
+          # Enable Performance & Networking Tweaks
+          ./scripts/config --file out/.config --enable CONFIG_TCP_CONG_ADVANCED
+          ./scripts/config --file out/.config --enable CONFIG_TCP_CONG_BBR
+          ./scripts/config --file out/.config --enable CONFIG_DEFAULT_BBR
+          ./scripts/config --file out/.config --set-str CONFIG_DEFAULT_TCP_CONG "bbr"
+          ./scripts/config --file out/.config --enable CONFIG_NET_SCH_FQ
+          ./scripts/config --file out/.config --enable CONFIG_NET_SCH_FQ_CODEL
+          ./scripts/config --file out/.config --enable CONFIG_WIREGUARD
+          ./scripts/config --file out/.config --enable CONFIG_SLAB_FREELIST_HARDENED
+          ./scripts/config --file out/.config --disable CONFIG_SCHEDSTATS
+          
           make "${MK[@]}" olddefconfig
           
           echo "Building Image..."
@@ -117,43 +121,13 @@ with open('.oplus_env.sh', 'w') as out:
           . ./mystic_version.sh
           mkdir -p release_out
           
-          # Download / Setup AnyKernel3
+          # Setup AnyKernel3
           git clone https://github.com/osm0sis/AnyKernel3.git ak3
           cp out/arch/arm64/boot/Image ak3/Image
           
-          python3 -c "
-ak_content = '''### AnyKernel3 Ramdisk Mod Script
-## osm0sis @ xda-developers
-properties() { '
-kernel.string=Mystic Kernel (ReSukiSU + SUSFS v2.3.0) by myzanori
-do.devicecheck=1
-do.modules=0
-do.systemless=1
-do.cleanup=1
-do.cleanuponabort=0
-device.name1=lemonades
-device.name2=OnePlus9R
-device.name3=kebab
-device.name4=OnePlus8T
-device.name5=20828
-device.name6=20838
-'; }
-boot_attributes() {
-set_perm_recursive 0 0 755 644 \$RAMDISK/*;
-set_perm_recursive 0 0 750 750 \$RAMDISK/init* \$RAMDISK/sbin;
-}
-BLOCK=boot;
-IS_SLOT_DEVICE=1;
-RAMDISK_COMPRESSION=auto;
-PATCH_VBMETA_FLAG=auto;
-. tools/ak3-core.sh;
-dump_boot;
-write_boot;
-'''
-with open('ak3/anykernel.sh', 'w') as f:
-    f.write(ak_content)
-"
-
+          # Copy branded anykernel config
+          sed -i 's/kernel.string=.*/kernel.string=Mystic Kernel '${MYSTIC_VERSION}' by myzanori/g' ak3/anykernel.sh || true
+          
           (cd ak3 && zip -r9 "../release_out/${MYSTIC_PREFIX}_${MYSTIC_FLAVOUR}_AnyKernel3.zip" . -x "*.git*" "*.zip")
           cp out/arch/arm64/boot/Image "release_out/${MYSTIC_PREFIX}.Image"
           ls -lh release_out/
@@ -205,46 +179,6 @@ with open('ak3/anykernel.sh', 'w') as f:
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RELEASE_TAG: ${{ steps.ver.outputs.tag }}
         run: |
-          python3 -c "
-import urllib.request, urllib.parse, os, glob
-
-token = os.environ.get('TG_TOKEN', '')
-chat_id = os.environ.get('TG_CHAT', '')
-tag = '${{ steps.ver.outputs.tag }}'
-
-if not token or not chat_id:
-    exit(0)
-
-caption = f'''<b>Mystic Kernel {tag} — Release</b>
-
-• <b>Device</b>: OnePlus 9R (lemonades / SM8250)
-• <b>ROM</b>: OxygenOS 14 (Android 14)
-• <b>Kernel</b>: 4.19.157-perf-Mystic-9R-myzanori-{tag}
-• <b>Status</b>: Boot Tested &amp; Verified (Working)
-• <b>Root</b>: ReSukiSU v4.2.0-rc3
-• <b>Hiding</b>: SUSFS v2.3.0
-• <b>TCP Congestion</b>: BBR + FQ-CoDel
-• <b>Camera</b>: 8/8 Sensors Operational
-• <b>SELinux</b>: Enforcing
-• <b>Developer</b>: @myzanori
-
-<b>Changelog:</b>
-<blockquote>
-• Built for OxygenOS 14 (LE2101_14.0.0.2401 &amp; B100P01)
-• ReSukiSU v4.2.0-rc3 with inline syscall hooks
-• SUSFS v2.3.0 kernel-side path, mount, and kstat hiding
-• BBR TCP Congestion Control &amp; FQ-CoDel queueing
-• Full vendor module compatibility (35/35 modules loaded)
-• Complete camera subsystem fix (8/8 sensors functional)
-• Native F2FS compression and inlinecrypt support
-</blockquote>'''
-
-import requests
-for f in glob.glob('release_out/*.zip'):
-    with open(f, 'rb') as doc:
-        files = {'document': doc}
-        data = {'chat_id': chat_id, 'caption': caption, 'parse_mode': 'HTML'}
-        r = requests.post(f'https://api.telegram.org/bot{token}/sendDocument', data=data, files=files)
-        print('Telegram response:', r.text)
-"
+          python3 build_tools/send_telegram.py || true
