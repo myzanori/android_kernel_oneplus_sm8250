@@ -167,12 +167,20 @@ jobs:
           tag_name: v1.0-${{ github.run_number }}
           name: Mystic Kernel v1.0 (Build ${{ github.run_number }})
           body: |
-            ## 🌿 Mystic Kernel v1.0 for OnePlus 9R (SM8250 / lemonades)
+            ## Mystic Kernel v1.0 for OnePlus 9R (SM8250 / lemonades)
             - **ROM**: OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
             - **Kernel Version**: `4.19.157-perf-Mystic-9R-myzanori-v1.0`
             - **Root**: ReSukiSU v4.2.0-rc3
             - **Hiding**: SUSFS v2.3.0
             - **Commit**: `${{ github.sha }}`
+
+            ### Changelog:
+            > - Initial release for OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
+            > - ReSukiSU v4.2.0-rc3 with inline syscall hooks
+            > - SUSFS v2.3.0 kernel-side path, mount, and kstat hiding
+            > - Full vendor module compatibility (35/35 modules loaded)
+            > - Native F2FS compression and inlinecrypt support
+            > - Complete camera subsystem fix (8/8 sensors functional)
           draft: false
           prerelease: false
         env:
@@ -184,21 +192,35 @@ jobs:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          CAPTION=$(printf '%s\n' \
-            "🌿 *Mystic Kernel v1.0 Released!*" \
-            "📱 *Device*: OnePlus 9R (lemonades)" \
-            "⚡ *ROM*: OxygenOS 14 (Android 14)" \
-            "🛡️ *Root*: ReSukiSU + SUSFS v2.3.0" \
-            "🔨 *Build*: \`${GITHUB_SHA::7}\`" \
-            "" \
-            "🔗 [GitHub Release](${{ steps.create_release.outputs.url }})")
-          
+          CAPTION=$(cat << 'EOF'
+<b>Mystic Kernel v1.0 — Official Release</b>
+
+• <b>Device</b>: OnePlus 9R (lemonades / SM8250)
+• <b>ROM</b>: OxygenOS 14 (Android 14)
+• <b>Kernel</b>: 4.19.157-perf-Mystic-9R-myzanori-v1.0
+• <b>Root</b>: ReSukiSU v4.2.0-rc3
+• <b>Hiding</b>: SUSFS v2.3.0
+• <b>Camera</b>: 8/8 Sensors Operational
+• <b>SELinux</b>: Enforcing
+• <b>Developer</b>: @myzanori
+
+<b>Changelog:</b>
+<blockquote>
+• Initial release for OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
+• ReSukiSU v4.2.0-rc3 with inline syscall hooks
+• SUSFS v2.3.0 kernel-side path, mount, and kstat hiding
+• Full vendor module compatibility (35/35 modules loaded)
+• Native F2FS compression and inlinecrypt support
+• Complete camera subsystem fix (8/8 sensors functional)
+</blockquote>
+EOF
+)
           for f in release_out/*.zip; do
             if [ -f "$f" ]; then
               echo "Sending $f to Telegram..."
               curl -sS --fail \
                 -F chat_id="${TG_CHAT}" \
-                -F parse_mode=Markdown \
+                -F parse_mode=HTML \
                 -F caption="${CAPTION}" \
                 -F document=@"$f" \
                 "https://api.telegram.org/bot${TG_TOKEN}/sendDocument" || true
