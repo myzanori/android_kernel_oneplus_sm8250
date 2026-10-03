@@ -4,7 +4,8 @@ export MYSTIC_NAME="Mystic Kernel"
 export MYSTIC_AUTHOR="myzanori"
 export MYSTIC_DEVICE="9R"
 export MYSTIC_ROM="OOS14"
-export MYSTIC_VERSION="1.0"
+# Versioning Rule: Stable slow increments (1.0.xx format for iterative builds)
+export MYSTIC_VERSION="1.0.01"
 export MYSTIC_FLAVOUR="ReSukiSU_SUSFS"
 
 # full artifact prefix

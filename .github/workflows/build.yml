@@ -158,18 +158,25 @@ jobs:
           name: Mystic-Kernel-Artifacts
           path: release_out/*
 
+      - name: Calculate Release Version Tag
+        id: ver
+        run: |
+          BUILD_NUM=$(printf "%02d" ${{ github.run_number }})
+          echo "tag=v1.0.${BUILD_NUM}" >> $GITHUB_OUTPUT
+          echo "version=1.0.${BUILD_NUM}" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')
         with:
           files: release_out/*
-          tag_name: v1.0-${{ github.run_number }}
-          name: Mystic Kernel v1.0 (Build ${{ github.run_number }})
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Mystic Kernel ${{ steps.ver.outputs.tag }}
           body: |
-            ## Mystic Kernel v1.0 for OnePlus 9R (SM8250 / lemonades)
+            ## Mystic Kernel ${{ steps.ver.outputs.tag }} for OnePlus 9R (SM8250 / lemonades)
             - **ROM**: OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
-            - **Kernel Version**: `4.19.157-perf-Mystic-9R-myzanori-v1.0`
+            - **Kernel Version**: `4.19.157-perf-Mystic-9R-myzanori-${{ steps.ver.outputs.tag }}`
             - **Root**: ReSukiSU v4.2.0-rc3
             - **Hiding**: SUSFS v2.3.0
             - **Commit**: `${{ github.sha }}`
