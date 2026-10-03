@@ -27,13 +27,23 @@ jobs:
             bc bison ca-certificates curl flex gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
             git libssl-dev lld llvm make python3 zip unzip libelf-dev
 
-      - name: Download & Extract Clang 10 Toolchain
+      - name: Download & Extract Clang 10 & AOSP GCC Toolchains
         run: |
-          mkdir -p toolchains/clang-10
+          mkdir -p toolchains/clang-10 toolchains/gcc-64 toolchains/gcc-32
           echo "Downloading official AOSP Clang 10 (r383902)..."
           curl -LSs --fail "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-11.0.0_r1/clang-r383902.tar.gz" -o clang.tar.gz
           tar -xzf clang.tar.gz -C toolchains/clang-10/
           rm -f clang.tar.gz
+
+          echo "Downloading official AOSP GCC 4.9 (64-bit)..."
+          curl -LSs --fail "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-11.0.0_r1.tar.gz" -o gcc64.tar.gz
+          tar -xzf gcc64.tar.gz -C toolchains/gcc-64/
+          rm -f gcc64.tar.gz
+
+          echo "Downloading official AOSP GCC 4.9 (32-bit)..."
+          curl -LSs --fail "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-11.0.0_r1.tar.gz" -o gcc32.tar.gz
+          tar -xzf gcc32.tar.gz -C toolchains/gcc-32/
+          rm -f gcc32.tar.gz
 
       - name: Clone OnePlus OSS Vendor Modules & Devicetree
         run: |
@@ -63,7 +73,7 @@ jobs:
           chmod +x mystic_version.sh build_tools/* 2>/dev/null || true
           . ./mystic_version.sh
           
-          export PATH="$PWD/toolchains/clang-10/bin:$PATH"
+          export PATH="$PWD/toolchains/clang-10/bin:$PWD/toolchains/gcc-64/bin:$PWD/toolchains/gcc-32/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/toolchains/clang-10/lib:${LD_LIBRARY_PATH:-}"
           export KCFLAGS="-Wno-strict-prototypes -Wno-missing-prototypes -Wno-unused-function -Wno-unused-variable"
           
@@ -73,7 +83,9 @@ jobs:
           
           CL="$PWD/toolchains/clang-10/bin/clang"
           MK=(O=out ARCH=arm64 CC="$CL" CLANG_TRIPLE=aarch64-linux-gnu- BRAND_SHOW_FLAG=oneplus
-              CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-)
+              LD="$PWD/toolchains/gcc-64/bin/aarch64-linux-android-ld" HOSTCC="$CL" HOSTCXX="$PWD/toolchains/clang-10/bin/clang++"
+              CROSS_COMPILE="$PWD/toolchains/gcc-64/bin/aarch64-linux-android-"
+              CROSS_COMPILE_ARM32="$PWD/toolchains/gcc-32/bin/arm-linux-androideabi-")
           
           echo "Configuring vendor/kona-perf_defconfig..."
           make "${MK[@]}" vendor/kona-perf_defconfig
