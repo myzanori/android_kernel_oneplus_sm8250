@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Build Environment & Dependencies
         run: |
