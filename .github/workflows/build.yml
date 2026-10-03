@@ -14,6 +14,8 @@ jobs:
   build:
     name: Build & Release Mystic Kernel
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
@@ -200,7 +202,6 @@ with open('ak3/anykernel.sh', 'w') as f:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Send Notification to Telegram
-        if: env.TG_TOKEN != '' && env.TG_CHAT != ''
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
