@@ -134,10 +134,12 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git ak3
           cp out/arch/arm64/boot/Image ak3/Image
           
-          # Copy branded anykernel config
+          # Copy unified Kona anykernel config
+          cp build_tools/anykernel.sh ak3/anykernel.sh
           sed -i 's/kernel.string=.*/kernel.string=Mystic Kernel '${MYSTIC_VERSION}' by myzanori/g' ak3/anykernel.sh || true
           
-          (cd ak3 && zip -r9 "../release_out/${MYSTIC_PREFIX}_${MYSTIC_FLAVOUR}_AnyKernel3.zip" . -x "*.git*" "*.zip")
+          # Build Unified AnyKernel3 Zip for 9R and 8T
+          (cd ak3 && zip -r9 "../release_out/${MYSTIC_UNIFIED_PREFIX}_${MYSTIC_FLAVOUR}_AnyKernel3.zip" . -x "*.git*" "*.zip")
           cp out/arch/arm64/boot/Image "release_out/${MYSTIC_PREFIX}.Image"
           ls -lh release_out/
 
@@ -163,18 +165,23 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: Mystic Kernel ${{ steps.ver.outputs.tag }}
           body: |
-            ## Mystic Kernel ${{ steps.ver.outputs.tag }} for OnePlus 9R (SM8250 / lemonades)
-            - **ROM**: OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
+            ## Mystic Kernel ${{ steps.ver.outputs.tag }} (Kona SM8250 Unified: OnePlus 9R & 8T)
+            - **Devices**: OnePlus 9R (lemonades) & OnePlus 8T (kebab)
+            - **ROM**: OxygenOS 14 (LE2101 / KB2001)
             - **Kernel Version**: `4.19.157-perf-Mystic-9R-myzanori-${{ steps.ver.outputs.tag }}`
+            - **Package**: Unified AnyKernel3 (preserves stock DTB & ramdisk per device)
             - **Status**: Boot Tested & Verified (Working)
             - **Root**: ReSukiSU v4.2.0-rc3
             - **Hiding**: SUSFS v2.3.0
             - **Commit**: `${{ github.sha }}`
 
             ### Changelog:
-            > - Built for OxygenOS 14 (LE2101_14.0.0.2401 & B100P01)
+            > - Unified SM8250 / Kona release for OnePlus 9R and OnePlus 8T
+            > - Built for OxygenOS 14 (LE2101 / KB2001)
             > - ReSukiSU v4.2.0-rc3 with inline syscall hooks
             > - SUSFS v2.3.0 kernel-side path, mount, and kstat hiding
+            > - Default Deadline I/O scheduler for zero UI stutter
+            > - Balanced ZRAM and CFS CPU scheduler latency (6ms / 1ms)
             > - BBR TCP Congestion Control & FQ-CoDel queueing
             > - Full vendor module compatibility (35/35 modules loaded)
             > - Complete camera subsystem fix (8/8 sensors functional)
