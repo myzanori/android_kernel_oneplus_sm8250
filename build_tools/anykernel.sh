@@ -1,5 +1,10 @@
-### AnyKernel3 Configuration for Mystic Kernel (SM8250 / Kona Unified)
-# properties
+### AnyKernel3 Ramdisk Mod Script
+## Mystic Kernel (SM8250 / Kona Unified for OnePlus 9R, 8T, 8, 8 Pro)
+
+### AnyKernel setup
+# global properties
+properties() { '
+kernel.string=Mystic Kernel by myzanori
 do.devicecheck=1
 do.modules=0
 do.systemless=1
@@ -25,18 +30,26 @@ device.name17=IN2011
 device.name18=IN2021
 supported.versions=11-14
 supported.patchlevels=
+supported.vendorpatchlevels=
+'; } # end properties
 
-# shell variables
-block=boot;
-is_slot_device=1;
-ramdisk_compression=auto;
-patch_vbmeta_flag=auto;
+### AnyKernel install
+## boot files attributes
+boot_attributes() {
+set_perm_recursive 0 0 755 644 $RAMDISK/*;
+set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
+} # end attributes
 
-## AnyKernel methods (DO NOT CHANGE)
-# import patching functions/variables - see for reference
+# boot shell variables
+BLOCK=boot;
+IS_SLOT_DEVICE=1;
+RAMDISK_COMPRESSION=auto;
+PATCH_VBMETA_FLAG=auto;
+
+# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
 . tools/ak3-core.sh;
 
-## AnyKernel boot install
+# boot install
 dump_boot;
 
 # write new kernel Image while keeping stock DTB & ramdisk
